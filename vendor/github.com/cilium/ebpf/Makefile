@@ -1,10 +1,10 @@
 # The development version of clang is distributed as the 'clang' binary,
 # while stable/released versions have a version number attached.
 # Pin the default clang to a stable version.
-CLANG ?= clang-14
-STRIP ?= llvm-strip-14
-OBJCOPY ?= llvm-objcopy-14
-CFLAGS := -O2 -g -Wall -Werror $(CFLAGS)
+CLANG ?= clang-20
+STRIP ?= llvm-strip-20
+OBJCOPY ?= llvm-objcopy-20
+CFLAGS := -O2 -g -Wall -Werror -mcpu=v2 $(CFLAGS)
 
 CI_KERNEL_URL ?= https://github.com/cilium/ci-kernels/raw/master/
 
@@ -16,17 +16,17 @@ UIDGID := $(shell stat -c '%u:%g' ${REPODIR})
 # Prefer podman if installed, otherwise use docker.
 # Note: Setting the var at runtime will always override.
 CONTAINER_ENGINE ?= $(if $(shell command -v podman), podman, docker)
-CONTAINER_RUN_ARGS ?= $(if $(filter ${CONTAINER_ENGINE}, podman), --log-driver=none, --user "${UIDGID}")
+CONTAINER_RUN_ARGS ?= $(if $(filter ${CONTAINER_ENGINE}, podman), \
+		--log-driver=none \
+		-v "$(shell go env GOCACHE)":/root/.cache/go-build \
+		-v "$(shell go env GOMODCACHE)":/go/pkg/mod, --user "${UIDGID}")
 
 IMAGE := $(shell cat ${REPODIR}/testdata/docker/IMAGE)
 VERSION := $(shell cat ${REPODIR}/testdata/docker/VERSION)
 
-
-# clang <8 doesn't tag relocs properly (STT_NOTYPE)
-# clang 9 is the first version emitting BTF
 TARGETS := \
-	testdata/loader-clang-7 \
-	testdata/loader-clang-9 \
+	testdata/loader-clang-14 \
+	testdata/loader-clang-17 \
 	testdata/loader-$(CLANG) \
 	testdata/manyprogs \
 	testdata/btf_map_init \
@@ -36,18 +36,25 @@ TARGETS := \
 	testdata/invalid_btf_map_init \
 	testdata/strings \
 	testdata/freplace \
+	testdata/fentry_fexit \
 	testdata/iproute2_map_compat \
 	testdata/map_spin_lock \
 	testdata/subprog_reloc \
 	testdata/fwd_decl \
 	testdata/kconfig \
-	testdata/kconfig_config \
+	testdata/ksym \
 	testdata/kfunc \
 	testdata/invalid-kfunc \
 	testdata/kfunc-kmod \
+	testdata/constants \
+	testdata/errors \
+	testdata/variables \
+	testdata/arena \
 	btf/testdata/relocs \
 	btf/testdata/relocs_read \
 	btf/testdata/relocs_read_tgt \
+	btf/testdata/relocs_enum \
+	btf/testdata/tags \
 	cmd/bpf2go/testdata/minimal
 
 .PHONY: all clean container-all container-shell generate
@@ -58,20 +65,24 @@ TARGETS := \
 container-all:
 	+${CONTAINER_ENGINE} run --rm -ti ${CONTAINER_RUN_ARGS} \
 		-v "${REPODIR}":/ebpf -w /ebpf --env MAKEFLAGS \
-		--env CFLAGS="-fdebug-prefix-map=/ebpf=." \
 		--env HOME="/tmp" \
+		--env BPF2GO_CC="$(CLANG)" \
+		--env BPF2GO_CFLAGS="$(CFLAGS)" \
 		"${IMAGE}:${VERSION}" \
 		make all
 
 # (debug) Drop the user into a shell inside the container as root.
+# Set BPF2GO_ envs to make 'make generate' just work.
 container-shell:
-	${CONTAINER_ENGINE} run --rm -ti \
+	${CONTAINER_ENGINE} run --rm -ti ${CONTAINER_RUN_ARGS} \
 		-v "${REPODIR}":/ebpf -w /ebpf \
+		--env BPF2GO_CC="$(CLANG)" \
+		--env BPF2GO_CFLAGS="$(CFLAGS)" \
 		"${IMAGE}:${VERSION}"
 
 clean:
-	-$(RM) testdata/*.elf
-	-$(RM) btf/testdata/*.elf
+	find "$(CURDIR)" -name "*.elf" -delete
+	find "$(CURDIR)" -name "*.o" -delete
 
 format:
 	find . -type f -name "*.c" | xargs clang-format -i
@@ -80,11 +91,9 @@ all: format $(addsuffix -el.elf,$(TARGETS)) $(addsuffix -eb.elf,$(TARGETS)) gene
 	ln -srf testdata/loader-$(CLANG)-el.elf testdata/loader-el.elf
 	ln -srf testdata/loader-$(CLANG)-eb.elf testdata/loader-eb.elf
 
-# $BPF_CLANG is used in go:generate invocations.
-generate: export BPF_CLANG := $(CLANG)
-generate: export BPF_CFLAGS := $(CFLAGS)
 generate:
-	go generate ./...
+	go generate -run "gentypes" ./...
+	go generate -skip "gentypes" ./...
 
 testdata/loader-%-el.elf: testdata/loader.c
 	$* $(CFLAGS) -target bpfel -c $< -o $@
@@ -102,14 +111,8 @@ testdata/loader-%-eb.elf: testdata/loader.c
 	$(CLANG) $(CFLAGS) -target bpfeb -c $< -o $@
 	$(STRIP) -g $@
 
-.PHONY: generate-btf
-generate-btf: KERNEL_VERSION?=5.19
-generate-btf:
-	$(eval TMP := $(shell mktemp -d))
-	curl -fL "$(CI_KERNEL_URL)/linux-$(KERNEL_VERSION).bz" -o "$(TMP)/bzImage"
-	/lib/modules/$(uname -r)/build/scripts/extract-vmlinux "$(TMP)/bzImage" > "$(TMP)/vmlinux"
-	$(OBJCOPY) --dump-section .BTF=/dev/stdout "$(TMP)/vmlinux" /dev/null | gzip > "btf/testdata/vmlinux.btf.gz"
-	curl -fL "$(CI_KERNEL_URL)/linux-$(KERNEL_VERSION)-selftests-bpf.tgz" -o "$(TMP)/selftests.tgz"
-	tar -xf "$(TMP)/selftests.tgz" --to-stdout tools/testing/selftests/bpf/bpf_testmod/bpf_testmod.ko | \
-		$(OBJCOPY) --dump-section .BTF="btf/testdata/btf_testmod.btf" - /dev/null
-	$(RM) -r "$(TMP)"
+.PHONY: update-kernel-deps
+update-kernel-deps: export KERNEL_VERSION?=6.8
+update-kernel-deps:
+	./testdata/sh/update-kernel-deps.sh
+	$(MAKE) container-all
