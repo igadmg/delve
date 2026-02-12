@@ -11,4 +11,5 @@ localtests
 *.iml
 .teamcity/target
 .vscode
+.claude
 dlv.exe
