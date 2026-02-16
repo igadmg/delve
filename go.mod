@@ -1,6 +1,6 @@
 module github.com/go-delve/delve
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/cilium/ebpf v0.20.0
@@ -13,16 +13,15 @@ require (
 	github.com/mattn/go-isatty v0.0.20
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
-	go.starlark.net v0.0.0-20260102030733-3fee463870c9
-	golang.org/x/arch v0.23.0
-	golang.org/x/sys v0.40.0
-	golang.org/x/telemetry v0.0.0-20260205145544-86a5c4bf3c8d
+	go.starlark.net v0.0.0-20260210143700-b62fd896b91b
+	golang.org/x/arch v0.24.0
+	golang.org/x/sys v0.41.0
+	golang.org/x/telemetry v0.0.0-20260213145524-e0ab670178e1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
-	github.com/clipperhouse/stringish v0.1.1 // indirect
-	github.com/clipperhouse/uax29/v2 v2.5.0 // indirect
+	github.com/clipperhouse/uax29/v2 v2.6.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/mattn/go-runewidth v0.0.19 // indirect
