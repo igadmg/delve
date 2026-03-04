@@ -12,12 +12,12 @@ require (
 	github.com/mattn/go-colorable v0.1.14
 	github.com/mattn/go-isatty v0.0.20
 	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.0.9
-	go.starlark.net v0.0.0-20231101134539-556fd59b42f6
+	github.com/spf13/pflag v1.0.10
+	go.starlark.net v0.0.0-20260210143700-b62fd896b91b
 	go.yaml.in/yaml/v3 v3.0.4
-	golang.org/x/arch v0.11.0
-	golang.org/x/sys v0.26.0
-	golang.org/x/telemetry v0.0.0-20241106142447-58a1122356f5
+	golang.org/x/arch v0.24.0
+	golang.org/x/sys v0.41.0
+	golang.org/x/telemetry v0.0.0-20260213145524-e0ab670178e1
 )
 
 require (
@@ -26,7 +26,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/mattn/go-runewidth v0.0.20 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/net v0.50.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
